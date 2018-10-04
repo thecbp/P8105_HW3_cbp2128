@@ -1,0 +1,114 @@
+---
+title: "Homework 3 Solutions"
+author: "Christian Pascual"
+date: "10/4/2018"
+output: github_document
+---
+
+# Preliminary imports and option settings
+
+```{r prelim_imports, message = FALSE }
+library(tidyverse)
+
+library(p8105.datasets)
+
+knitr::opts_chunk$set(
+  fig.width = 8,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal())
+```
+
+This homework focuses on visualization in exploratory data analysis, so we need the plotting from `tidyverse` and the data from `p8105.datasets`. I like the minimal theme, so I've set it for this homework. 
+
+# Problem 1 
+
+## Data loading and cleaning
+
+This problem requires the BRFSS dataset, which we'll pull from `p8105.datasets`. We'll clean the dataset a bit before diving into answering the questions
+
+```{r clean_brfss }
+raw_BRFSS = p8105.datasets::brfss_smart2010
+
+tidy_BRFSS = raw_BRFSS %>% 
+  janitor::clean_names() %>% 
+  filter(., topic == "Overall Health") %>% 
+  mutate(., response = as.factor(response))
+```
+
+We've limited our BRFSS dataset to the "Overall Health" topic and converted the `response` column into a factor variable from a string. We can now start asking questions from the data.
+
+## Problem 1 questions
+
+#### In 2002, which states were observed at 7 locations?
+
+The `locationdesc` column describes where the survey was conducted in a state, and the year encodes when the survey was administered. Thus, we need to use these columns to answer this question. Each state is associated with multiple locations in `locationdesc`, so we can group the states and then count the unique values in this column.
+
+```{r P1_solution1 }
+states_w_7_locs_in_2002 = tidy_BRFSS %>% 
+  filter(., year == 2002) %>% 
+  group_by(locationabbr) %>% 
+  summarize(num_rows = n(),
+            num_unique_locs = n_distinct(locationdesc)) %>% 
+  filter(., num_unique_locs == 7)
+
+knitr::kable(states_w_7_locs_in_2002)
+```
+
+There were `r nrow(states_w_7_locs_in_2002)` states with 7 locations listed in 2002. This result suggests that only a few states had such extensive surveying done in the early years of the dataset. 
+
+#### Make a “spaghetti plot” that shows the number of observations in each state from 2002 to 2010.
+
+A spaghetti plot seems to be a regular line plot with many, many lines on it. For the BRFSS dataset, our `x` axis will take on the years from 2002 to 2010, and the `y` axis will plot the amount of observations for each state. Each line will correspond to a state, leaving us with 51 lines for each state with one for the District of Columbia. 
+
+```{r spaghetti_states, message = FALSE }
+spaghetti_states = tidy_BRFSS %>% 
+  filter(., year >= 2002 & year <= 2010) %>% 
+  group_by(locationabbr, year) %>% 
+  summarize(num_rows = n(),
+            summed_sample_size = sum(sample_size))
+
+ggplot(data = spaghetti_states, 
+       aes(x = year, y = summed_sample_size, color = locationabbr)) +
+  geom_line(alpha = 0.5)
+```
+
+A lot of stuff is happening in the plot. There is a lot of clumping at the bottom of the graph since many states with relatively small amounts of observations. States like Florida and Texas take extreme values change the axes which make it more difficult to peer into the state-spaghetti clump.
+
+#### Make a table for the years 2002, 2006, and 2010 and show the mean and standard deviation of the proportion of “Excellent” responses across locations in NY State.
+
+To make this table, we need to filter out all the years except for 2002, 2006, and 2010. Then, we can use `group_by()` to gather everything and use `summarize()` to get the mean and standard deviation.
+
+```{r tabula_standarditva }
+relevant_years = c(2002, 2006, 2010)
+
+tabulated_stats = tidy_BRFSS %>% 
+  filter(., year %in% relevant_years & 
+           response == "Excellent" & 
+           locationabbr == "NY") %>% 
+  group_by(year) %>% 
+  summarize(`Mean Excellent prop.` = round(mean(data_value), 1),
+            `Std. of Excellent prop.` = round(var(data_value), 1))
+
+knitr::kable(tabulated_stats)
+```
+
+According to `tabulated_stats`, the mean proportion of "Excellent scores" remains relatively constant from 2002 to 2010, but the variance decreases in this same time frame. This trend suggests that the various locations in NY surveyed have started to agree on the degree of "excellence".
+
+#### For each year and state, compute the average proportion in each response category (taking the average across locations in a state). Make a five-panel plot that shows, for each response category separately, the distribution of these state-level averages over time.
+
+This is a graph that requires 5 separate charts that look at proportion for each `response` value through time. Thus, we'll need to `group_by()` both state and year, and then `summarize()` the `data_value` for each `response` by mean.
+
+```{r five_panel_bonanza }
+avgd_resp_thru_time = tidy_BRFSS %>% 
+  group_by(year, locationabbr, response) %>% 
+  summarize(avg_prop = mean(data_value))
+
+poor_thru_time = ggplot(data = filter(avgd_resp_thru_time, response == "Poor"),
+                        aes = (x = year, y = avg_prop, color = locationabbr))
+
+knitr::kable(five_panels_of_proportion)
+```
+
