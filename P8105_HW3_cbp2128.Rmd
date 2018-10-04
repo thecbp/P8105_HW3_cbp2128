@@ -9,8 +9,9 @@ output: github_document
 
 ```{r prelim_imports, message = FALSE }
 library(tidyverse)
-
+library(knitr)
 library(p8105.datasets)
+library(patchwork)
 
 knitr::opts_chunk$set(
   fig.width = 8,
@@ -54,7 +55,7 @@ states_w_7_locs_in_2002 = tidy_BRFSS %>%
             num_unique_locs = n_distinct(locationdesc)) %>% 
   filter(., num_unique_locs == 7)
 
-knitr::kable(states_w_7_locs_in_2002)
+kable(states_w_7_locs_in_2002)
 ```
 
 There were `r nrow(states_w_7_locs_in_2002)` states with 7 locations listed in 2002. This result suggests that only a few states had such extensive surveying done in the early years of the dataset. 
@@ -92,7 +93,7 @@ tabulated_stats = tidy_BRFSS %>%
   summarize(`Mean Excellent prop.` = round(mean(data_value), 1),
             `Std. of Excellent prop.` = round(var(data_value), 1))
 
-knitr::kable(tabulated_stats)
+kable(tabulated_stats)
 ```
 
 According to `tabulated_stats`, the mean proportion of "Excellent scores" remains relatively constant from 2002 to 2010, but the variance decreases in this same time frame. This trend suggests that the various locations in NY surveyed have started to agree on the degree of "excellence".
@@ -106,9 +107,21 @@ avgd_resp_thru_time = tidy_BRFSS %>%
   group_by(year, locationabbr, response) %>% 
   summarize(avg_prop = mean(data_value))
 
-poor_thru_time = ggplot(data = filter(avgd_resp_thru_time, response == "Poor"),
-                        aes = (x = year, y = avg_prop, color = locationabbr))
+# Making individual vars cuz looping syntax looked horrifying
+poor_data = filter(avgd_resp_thru_time, response == "Poor")
+fair_data = filter(avgd_resp_thru_time, response == "Fair")
+good_data = filter(avgd_resp_thru_time, response == "Good")
+very_good_data = filter(avgd_resp_thru_time, response == "Very good")
+excellent_data = filter(avgd_resp_thru_time, response == "Excellent")
 
-knitr::kable(five_panels_of_proportion)
+produce_panel = function(data) {
+  return(
+    ggplot(data = data,
+       aes(x = year, y = avg_prop, color = locationabbr)) + 
+  geom_line(alpha = 0.2)
+  )
+}
+
+produce_panel(poor_data) / produce_panel(fair_data) / produce_panel(good_data) / produce_panel(very_good_data) / produce_panel(excellent_data)
 ```
 
