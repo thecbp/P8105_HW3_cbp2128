@@ -24,7 +24,7 @@ theme_set(theme_minimal())
 
 This homework focuses on visualization in exploratory data analysis, so we need the plotting from `tidyverse` and the data from `p8105.datasets`. I like the minimal theme, so I've set it for this homework. 
 
-# Problem 1 
+# Problem 1: BRFSS
 
 ## Data loading and cleaning
 
@@ -47,7 +47,7 @@ We've limited our BRFSS dataset to the "Overall Health" topic and converted the 
 
 The `locationdesc` column describes where the survey was conducted in a state, and the year encodes when the survey was administered. Thus, we need to use these columns to answer this question. Each state is associated with multiple locations in `locationdesc`, so we can group the states and then count the unique values in this column.
 
-```{r P1_solution1 }
+```{r P1_states_of_7 }
 states_w_7_locs_in_2002 = tidy_BRFSS %>% 
   filter(., year == 2002) %>% 
   group_by(locationabbr) %>% 
@@ -64,7 +64,7 @@ There were `r nrow(states_w_7_locs_in_2002)` states with 7 locations listed in 2
 
 A spaghetti plot seems to be a regular line plot with many, many lines on it. For the BRFSS dataset, our `x` axis will take on the years from 2002 to 2010, and the `y` axis will plot the amount of observations for each state. Each line will correspond to a state, leaving us with 51 lines for each state with one for the District of Columbia. 
 
-```{r spaghetti_states, message = FALSE }
+```{r P1_spaghetti_states, message = FALSE }
 spaghetti_states = tidy_BRFSS %>% 
   filter(., year >= 2002 & year <= 2010) %>% 
   group_by(locationabbr, year) %>% 
@@ -82,7 +82,7 @@ A lot of stuff is happening in the plot. There is a lot of clumping at the botto
 
 To make this table, we need to filter out all the years except for 2002, 2006, and 2010. Then, we can use `group_by()` to gather everything and use `summarize()` to get the mean and standard deviation.
 
-```{r tabula_standarditva }
+```{r P1_tabula_standarditva }
 relevant_years = c(2002, 2006, 2010)
 
 tabulated_stats = tidy_BRFSS %>% 
@@ -102,7 +102,7 @@ According to `tabulated_stats`, the mean proportion of "Excellent scores" remain
 
 This is a graph that requires 5 separate charts that look at proportion for each `response` value through time. Thus, we'll need to `group_by()` both state and year, and then `summarize()` the `data_value` for each `response` by mean.
 
-```{r five_panel_bonanza, warning = FALSE }
+```{r P1_five_panel_bonanza, warning = FALSE }
 avgd_resp_thru_time = tidy_BRFSS %>% 
   group_by(year, locationabbr, response) %>% 
   summarize(avg_prop = mean(data_value))
@@ -122,20 +122,22 @@ produce_panel = function(data) {
   )
 }
 
-produce_panel(poor_data) 
-produce_panel(fair_data) 
-produce_panel(good_data) 
-produce_panel(very_good_data) 
-produce_panel(excellent_data)
+#produce_panel(poor_data) 
+#produce_panel(fair_data) 
+#produce_panel(good_data) 
+#produce_panel(very_good_data) 
+#produce_panel(excellent_data)
 ```
 
-# Problem 2
+# Problem 2: Instacart
 
 This problem focuses on exploring the Instacart dataset, contained in `p8105.datasets`. To get started, we'll grab the data.
 
 ```{r instacart_loading }
 instacart = p8105.datasets::instacart
 ```
+
+## A cursory look at the Instacart data set
 
 The `instacart` dataset has `r nrow(instacart)` and `r ncol(instacart)` columns, making it exceptionally large. In general, the dataset describes the orders and reorders of Instacart users in 2017.  We can look at the contents of particular orders by `order_id` and can look at the `department` and `aisle` a product comes from. Along with `product_id`s, we also have access to the precise name of the product in `product_name`, which range from "Bulgarian Yogurt" to "Sustainably Soft Bath Tissue".
 
@@ -145,3 +147,67 @@ We won't be doing any machine learning in this homework, but we can answer some 
 
 ## Problem 2 questions
 
+#### How many aisles are there, and which aisles are the most items ordered from?
+
+This question requires us to group the aisles and count the number of rows present for each grouping.
+
+```{r P2_aisles }
+aisle_grouping = instacart %>% 
+  group_by(aisle, aisle_id) %>% 
+  summarize(n_rows = n()) %>% 
+  arrange(-n_rows)
+```
+
+`aisle_grouping` tells us that there are `r nrow(aisle_grouping)` aisles. By counting the number of times an `aisle_id` appears, we can use this to find out where the most items are ordered from. The top 3 aisles that are ordered from are "fresh vegatables", "fresh fruits", and "packaged vegetable fruits". This finding makes sense, since these items spoil relatively fast and thus require frequent ordering. Or perhaps Instacart users are particularly health-inclined.
+
+#### Make a plot that shows the number of items ordered in each aisle. 
+
+To approach this problem, we can use the `aisle_grouping` tibble that I created from the last question. `n_rows` represents the number of items ordered, and the tibble has been rearranged into descending order.
+
+```{r P2_items_by_aisles }
+ggplot(data = instacart,
+       aes(x = aisle)) +
+  geom_bar() + coord_flip()
+```
+
+comments about bar graph
+
+#### Make a table showing the most popular item aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”
+
+To approach this problem, we require a grouping of the `instacart` data on both the `aisle` and the `product_name`. We can then `summarize()` based on the count of the rows in each of these groups and pick out the exact aisles we need for the table after filtering by rank.
+
+```{r P2_popular_items_by aisle, warning = FALSE }
+relevant_aisles = c("baking ingredients", "dog food care", "packaged vegetables fruits")
+
+most_popular_items = instacart %>% 
+  group_by(aisle, product_name) %>% 
+  summarize(n_rows = n()) %>% 
+  filter(min_rank(desc(n_rows)) < 2,
+         aisle %in% relevant_aisles) %>% 
+  arrange(-n_rows)
+
+kable(most_popular_items)
+```
+
+The following table gives the most popular item in the prescribed aisles, along with how many times that item appeared in the dataset. 
+
+#### Make a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week; format this table for human readers (i.e. produce a 2 x 7 table).
+
+This problem requires a grouping and subsequent spreading of the summary data. We need to group by the relevant items and day of the week, summarizing on the `order_hour_of_day`. After, we spread these rows out into columns for reading ease.
+
+```{r P2_pink_lady_apples_are_terrible }
+pink_and_coffee = instacart %>% 
+  filter(., product_name == "Pink Lady Apples" | 
+           product_name == "Coffee Ice Cream") %>% 
+  group_by(product_name, order_dow) %>% 
+  summarize(mean_order_hour = mean(order_hour_of_day)) %>% 
+  spread(key = order_dow, value = mean_order_hour)
+
+kable(pink_and_coffee)
+```
+
+The table tells us that, on average, coffee ice cream is ordered later in the day than Pink Lady Apples. The greatest difference in mean purchase hour is about 4 on Tuesdays, indicating customer realizations that it is only the middle of the week still and they have only 2 days until Data Science homework is due.
+
+# Problem 3: NY NOAA
+
+This problem focuses on exploration of the `NY NOAA` dataset.
