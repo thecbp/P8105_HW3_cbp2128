@@ -102,7 +102,7 @@ According to `tabulated_stats`, the mean proportion of "Excellent scores" remain
 
 This is a graph that requires 5 separate charts that look at proportion for each `response` value through time. Thus, we'll need to `group_by()` both state and year, and then `summarize()` the `data_value` for each `response` by mean.
 
-```{r five_panel_bonanza }
+```{r five_panel_bonanza, warning = FALSE }
 avgd_resp_thru_time = tidy_BRFSS %>% 
   group_by(year, locationabbr, response) %>% 
   summarize(avg_prop = mean(data_value))
@@ -118,10 +118,30 @@ produce_panel = function(data) {
   return(
     ggplot(data = data,
        aes(x = year, y = avg_prop, color = locationabbr)) + 
-  geom_line(alpha = 0.2)
+  geom_line(alpha = 0.5, show.legend=FALSE)
   )
 }
 
-produce_panel(poor_data) / produce_panel(fair_data) / produce_panel(good_data) / produce_panel(very_good_data) / produce_panel(excellent_data)
+produce_panel(poor_data) 
+produce_panel(fair_data) 
+produce_panel(good_data) 
+produce_panel(very_good_data) 
+produce_panel(excellent_data)
 ```
+
+# Problem 2
+
+This problem focuses on exploring the Instacart dataset, contained in `p8105.datasets`. To get started, we'll grab the data.
+
+```{r instacart_loading }
+instacart = p8105.datasets::instacart
+```
+
+The `instacart` dataset has `r nrow(instacart)` and `r ncol(instacart)` columns, making it exceptionally large. In general, the dataset describes the orders and reorders of Instacart users in 2017.  We can look at the contents of particular orders by `order_id` and can look at the `department` and `aisle` a product comes from. Along with `product_id`s, we also have access to the precise name of the product in `product_name`, which range from "Bulgarian Yogurt" to "Sustainably Soft Bath Tissue".
+
+The most interesting aspect of the data is perhaps the extensive order information, which we can link not just to users by `user_id` but also if the item is `reordered` or not. The resolution of the data is down to the hour, making it exceptionally granular. We can look at how many orders a user has done (`order_number`) and the precise *order* that a customer added an item to their cart. We may not have all of a user's orders in the dataset, but we do know if an item was `reordered` or not. For example, `user_id 1` ordered 11 items in their 11th order, and 10 of these items were reorders. This data suggests that this user is a frequent user of the site and uses the site to get their regular groceries, based on the items ordered (ie, Whole Milk, Paper Towels and Cinnamon Toast Crunch). Since this seems to be training data, this dataset was no doubt used to segment Instacart's customers in a machine learning process.
+
+We won't be doing any machine learning in this homework, but we can answer some questions about it. 
+
+## Problem 2 questions
 
