@@ -222,12 +222,13 @@ In its raw form, the NOAA data set is quite large, coming in at `r nrow(raw_NY_N
 
 ## Cleaning the NOAA dataset
 
-We'd like to separate the date into its constituent parts and standardize the units between `prcp`, `snow` and `snwd`. The temperature columns need to be converted into doubles (tricky) brought into degrees, rather than tenths of a degree as well.
-
+We'd like to separate the date into its constituent parts and standardize the units between `prcp`, `snow` and `snwd`. The temperature columns need to be converted into doubles (tricky) brought into degrees, rather than tenths of a degree as well. 
 ```{r noaa_cleaning }
 clean_NY_NOAA = raw_NY_NOAA %>% 
   separate(., date, into = c("year", "month", "day"), sep = "-") %>% 
-  mutate(pcrp_mm = ifelse(!is.na(prcp), prcp / 10, NA),
+  mutate(month = as.integer(month),
+         day = as.integer(day),
+         prcp_in = ifelse(!is.na(prcp), prcp / 10, NA),
          tmax_C = ifelse(!is.na(tmax), as.double(tmax) / 10, NA),
          tmin_C = ifelse(!is.na(tmin), as.double(tmin) / 10, NA))
 ```
@@ -240,7 +241,7 @@ We can get a visualization of the frequency of snowfall measurements in a histog
 
 ```{r P3_wheres_my_snow }
 ggplot(data = clean_NY_NOAA,
-       aes(snwd)) +
+       aes(snow)) +
   geom_histogram()
 ```
 
@@ -248,6 +249,52 @@ New York's temperautres range greatly throughout the year, and snowfall can only
 
 #### Make a two-panel plot showing the average temperature in January and in July in each station across years. Is there any observable / interpretable structure? Any outliers?
 
+This questions wants to look at January and July through time on the scale of years. We need two plots since question specifies two-panel, so `patchwork` will do that work for us. We can only calculate average temperature when we have both `tmax` and `tmin`, so we have to also filter out rows which do not have both of these values.
 
+```{r P3_jan_vs_jul_temps }
+jan_jul_temps = clean_NY_NOAA %>% 
+  filter(., month == 1 | month == 7,
+         !is.na(tmax_C) & !is.na(tmin_C)) %>% 
+  mutate(sample_temp_avg = (tmax_C + tmin_C) / 2)
 
-#### Make a two-panel plot showing (i) tmax vs tmin for the full dataset (note that a scatterplot may not be the best option); and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+jan_temps = ggplot(data = filter(jan_jul_temps, month == 1),
+                   aes(x = year, y = sample_temp_avg)) +
+  geom_boxplot()
+jul_temps = ggplot(data = filter(jan_jul_temps, month == 7),
+                   aes(x = year, y = sample_temp_avg)) +
+  geom_boxplot()
+
+jan_temps / jul_temps
+```
+
+Since each station measures a different maximum and minimum temperature, my approach was to look at the distribution of these station measurements with a boxplot. We see that the average temperature in January is much lower than July through the duration of 1981 to 2010, hovering below 0°C. Both January and July have outlier measurements through time, but January seems to have greater variance.
+
+#### Make a two-panel plot showing 1) tmax vs tmin for the full dataset and 2) a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+
+These two plots require us to look at the entire dataset, so no filters here. We will have one plot for `tmax_C` and `tmin_C` and another for `snow_in` distribution through time.
+
+```{r temp_thru_time }
+min_max_pairs = ggplot(data = clean_NY_NOAA, 
+                   aes(x = tmax_C, y = tmin_C)) +
+  geom_bin2d(bins = c(50, 50))
+
+snowfall_thru_time = clean_NY_NOAA %>% 
+  filter(., snow > 0 & snow < 100) %>% 
+  group_by(year) %>% 
+  summarize(n_rows = n(),
+            avg_snow = mean(snow),
+            std_err_snow = (var(snow) / n_rows)**(1/2)) %>% 
+  ggplot(data = ., aes(x = year, group = 1)) +
+  geom_line(aes(y = avg_snow, fill = "blue")) +
+  geom_ribbon(aes(ymin = avg_snow - 1.96 * std_err_snow, 
+                  ymax = avg_snow + 1.96 * std_err_snow), 
+              fill = "blue", alpha = 0.5)
+  
+min_max_pairs
+
+snowfall_thru_time
+```
+
+The `tmax_C` vs `tmin_C` comparison gives us an elliptical shape that suggests that the ranges for the two variables are different. Most of the heat ranges from 0°C to 30°C for `tmax_C` and from 0°C to 15°C for `tmin_C`. These ranges capture the lows of winter to the balmy summers.
+
+The distribution of `snow` shows that snowfall remained relatively stable around 32mm of snow up until 2005. The years after that suggest a drop in the amount of snowfall. The solid line describes the trend in mean snowfall amount, and the ribbon captures a 95% confidence interval for the mean snowfall for each year. The distirbution of snowfall values between 0 and 100 are slightly right-skewed, but the sheer amount of data points can reduce the sampling variance enough to be reasonably normal.
